@@ -1,4 +1,6 @@
 // lib/services/gemini_service.dart
+// import 'dart:nativewrappers/_internal/vm/lib/internal_patch.dart';
+import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 class GeminiService {
@@ -9,7 +11,7 @@ class GeminiService {
     _model = GenerativeModel(
       model: 'gemini-2.0-flash-exp',
       apiKey: _apiKey,
-      systemInstruction: Content.text(_getParentalTonePrompt()),
+      // systemInstruction: Content.text(_getParentalTonePrompt()),
     );
   }
 
@@ -41,18 +43,38 @@ difficult conversation with thier parent" but not tell advice them to tell every
 ''';
   }
 
+  String getPrompt(String message) {
+    String prompt = "Give me the answer in strict json {preSummary,Steps:{},postSummary} format (No text before and after json-include everything in json) with keys as step numbers. Include pre and post summary also in json. For the question asked by child: $message.";
+    return prompt;
+  }
+
   Future<String> getResponse(String message, String subject, int age) async {
     try {
+      String questionPrompt = getPrompt(message);
       final prompt = '''
 Subject: $subject
-Child's age: $age
-Child says: "$message"
-Respond as a loving parent would, adapting to their level.
+prompt: "$questionPrompt"
 ''';
-
+      //Child's age: $age
+//Respond as a loving parent would, adapting to their level.
       final response = await _model.generateContent([Content.text(prompt)]);
-      return response.text ?? 'I\'m here to help, sweetheart. Can you ask that again?';
+      // print(response as String);
+      if (response.text != null) {
+        print(response.text);
+        String resp = response.text ?? "{}";
+        resp = resp.replaceAll('\u00A0', ' ');
+        resp = resp.replaceAll("```json", "");
+        resp = resp.replaceAll("```", "");
+        print(resp.trim());
+        Map<String, dynamic> dataAsMap = jsonDecode(resp.trim());
+        // print(dataAsMap as String);
+        return dataAsMap["preSummary"];
+      } else {
+        return 'I\'m here to help, sweetheart. Can you ask that again?';
+      }
+      // prove (a+b)^2
     } catch (e) {
+      print(e);
       return 'Something went wrong, dear. Let\'s try again in a moment.';
     }
   }
